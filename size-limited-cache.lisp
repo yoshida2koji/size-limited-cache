@@ -17,7 +17,8 @@
 (defstruct cache-container
   (value)
   (size 0 :type (integer 0))
-  (last-used-at 0 :type (integer 0)))
+  (last-used-at 0 :type (integer 0))
+  (on-cache-removed nil :type (or null function)))
 
 
 (defstruct cache-manager
@@ -29,6 +30,8 @@
 (defun %clear-cache (manager key container)
   (decf (cache-manager-size manager) (cache-container-size container))
   (remhash key (cache-manager-cache-table manager))
+  (when (functionp (cache-container-on-cache-removed container))
+    (funcall (cache-container-on-cache-removed container)))
   (values))
 
 (defun clear-cache (manager key)
@@ -76,14 +79,15 @@
           (t (setf (cache-container-last-used-at container) (get-internal-real-time))
              (cache-container-value container)))))
 
-(defun add-cache (manager key value size)
+(defun add-cache (manager key value size &optional on-cache-removed)
   (clear-cache manager key)
   (when (> (cache-manager-size manager) (cache-manager-max-size manager))
     (clear-old-cache manager))
   (setf (gethash key (cache-manager-cache-table manager))
         (make-cache-container :value value
                               :size size
-                              :last-used-at (get-internal-real-time)))
+                              :last-used-at (get-internal-real-time)
+                              :on-cache-removed on-cache-removed))
   (incf (cache-manager-size manager) size)
   value)
 
